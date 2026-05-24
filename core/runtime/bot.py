@@ -13,12 +13,12 @@ from core.markets.canonical import CanonicalMarketState
 from core.microstructure.features import MicrostructureEngine
 from core.ptb.lifecycle import PTBMetadataUnavailable, PTBProvider
 from core.rtds.chainlink import ChainlinkRTDSClient
-from core.runtime.clock import bucket_5m, mono_ns
+from core.runtime.clock import bucket_5m
 from core.runtime.health import HealthMonitor
 from core.runtime.supervisor import TaskSupervisor
 from core.settlement.service import SettlementService
 from core.strategy.engine import ProbabilisticStrategyEngine
-from core.types import FeedKind, PriceTick, PTBMarket, RuntimeEvent, TopOfBook, TradeTick
+from core.types import FeedKind, PriceTick, PTBMarket, RuntimeEvent, SignalSource, TopOfBook, TradeTick
 from core.wallet.service import WalletService
 from core.websocket.exchange_feeds import BinanceFeed, CoinbaseFeed
 from core.websocket.polymarket import MarketSubscriptionState, PolymarketMarketFeed, PolymarketUserFeed
@@ -244,11 +244,11 @@ class InstitutionalBTCPolyBot:
             await asyncio.sleep(1.0)
             archive = await self.market_state.archive()
             current = await self.market_state.current()
-            states = list(archive.values()) + ([current] if current is not None else [])
+            states = list(archive.values())
+            if current is not None:
+                states.append(current)
             now = time.time()
             for state in states:
-                if state is None:
-                    continue
                 market = state.market
                 if market.condition_id in self._settlement_seen or now < market.close_ts + 2.0:
                     continue
@@ -295,7 +295,7 @@ class InstitutionalBTCPolyBot:
         await self._put_event(RuntimeEvent(FeedKind.CHAINLINK, tick, tick.recv_mono_ns))
 
     async def _on_exchange_event(self, event: TopOfBook | TradeTick) -> None:
-        kind = FeedKind.BINANCE if getattr(event, "source", None).value == "binance" else FeedKind.COINBASE
+        kind = FeedKind.BINANCE if event.source is SignalSource.BINANCE else FeedKind.COINBASE
         await self._put_event(RuntimeEvent(kind, event, event.recv_mono_ns))
 
     async def _on_poly_event(self, event: TopOfBook | TradeTick) -> None:

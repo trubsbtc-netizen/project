@@ -7,12 +7,8 @@ from dataclasses import dataclass
 
 from core.config import ContractConfig, SettlementConfig
 from core.settlement.contracts import CONDITIONAL_TOKENS_ABI
+from core.transport.web3_provider import build_web3
 from core.types import SettlementTruth
-
-try:
-    from web3 import Web3
-except ImportError:  # pragma: no cover
-    Web3 = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -26,22 +22,13 @@ class SettlementService:
     def __init__(self, contracts: ContractConfig, config: SettlementConfig) -> None:
         self._contracts = contracts
         self._config = config
-        self._web3 = self._build_web3()
+        self._web3 = build_web3(contracts)
         self._ctf = None
         if self._web3 is not None:
             self._ctf = self._web3.eth.contract(
                 address=self._web3.to_checksum_address(contracts.conditional_tokens),
                 abi=CONDITIONAL_TOKENS_ABI,
             )
-
-    def _build_web3(self):
-        if Web3 is None:
-            return None
-        if self._contracts.polygon_ws_rpc:
-            return Web3(Web3.WebsocketProvider(self._contracts.polygon_ws_rpc, websocket_timeout=8))
-        if self._contracts.allow_http_rpc and self._contracts.polygon_http_rpc:
-            return Web3(Web3.HTTPProvider(self._contracts.polygon_http_rpc, request_kwargs={"timeout": 8}))
-        return None
 
     async def readiness(self) -> SettlementReadiness:
         if self._web3 is None:
