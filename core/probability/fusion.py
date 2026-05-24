@@ -47,19 +47,25 @@ class BayesianEvidenceFusion:
         self._calibrator.update(predicted_p_up, outcome_up, weight=1.0)
 
     def estimate(self, snap: MicrostructureSnapshot) -> ProbabilityEstimate:
-        obs_var = max(1e-8, snap.exchange_divergence * snap.exchange_divergence + snap.realized_vol * 0.02)
+        truth_price = max(1e-8, snap.truth_price)
+        realized_vol = max(1e-8, snap.realized_vol)
+        price_vol_per_s = truth_price * realized_vol
+        obs_var = max(
+            1e-12,
+            (truth_price * snap.exchange_divergence) ** 2 + price_vol_per_s * price_vol_per_s * 0.02,
+        )
         filtered_price, filtered_drift, filtered_var = self._kalman.update(
             snap.truth_price,
             obs_var=obs_var,
             ts_ns=snap.ts_mono_ns,
-            vol_per_s=max(1e-8, snap.realized_vol),
+            vol_per_s=price_vol_per_s,
         )
         base_p, boundary_density = self._kalman.terminal_up_probability(
             snap.price_to_beat,
             snap.seconds_to_expiry,
-            max(1e-8, snap.realized_vol),
+            price_vol_per_s,
         )
-        ret_z = clamp(filtered_drift / max(1e-8, snap.realized_vol), -8.0, 8.0)
+        ret_z = clamp(filtered_drift / price_vol_per_s, -8.0, 8.0)
         flow_z = clamp(snap.taker_aggression + 0.5 * snap.flow_acceleration, -8.0, 8.0)
         imbalance_z = clamp(0.55 * snap.spoof_resistant_imbalance + 0.45 * snap.book_pressure, -8.0, 8.0)
         absorption = max(snap.absorption_up, snap.absorption_down)
@@ -127,9 +133,10 @@ class BayesianEvidenceFusion:
         )
 
     def _evidence(self, snap: MicrostructureSnapshot, drift: float, boundary_density: float) -> EvidenceVector:
-        distance_scale = max(1e-8, snap.realized_vol * max(1.0, snap.seconds_to_expiry) ** 0.5)
+        price_vol_per_s = max(1e-8, snap.truth_price) * max(1e-8, snap.realized_vol)
+        distance_scale = max(1e-8, price_vol_per_s * max(1.0, snap.seconds_to_expiry) ** 0.5)
         signed_dist_z = clamp(snap.signed_distance / distance_scale, -8.0, 8.0)
-        drift_z = clamp(drift / max(1e-8, snap.realized_vol), -8.0, 8.0)
+        drift_z = clamp(drift / price_vol_per_s, -8.0, 8.0)
         continuation = (
             0.46 * drift_z
             + 0.24 * snap.taker_aggression
@@ -197,8 +204,9 @@ class BayesianEvidenceFusion:
 
     def _directional_hazard(self, snap: MicrostructureSnapshot, drift: float, boundary_density: float) -> float:
         t = max(1e-3, snap.seconds_to_expiry)
-        drift_side = math.tanh(drift / max(1e-8, snap.realized_vol))
-        crossing_hazard = boundary_density * max(1e-8, snap.realized_vol) / max(1.0, t**0.5)
+        price_vol_per_s = max(1e-8, snap.truth_price) * max(1e-8, snap.realized_vol)
+        drift_side = math.tanh(drift / price_vol_per_s)
+        crossing_hazard = boundary_density * price_vol_per_s / max(1.0, t**0.5)
         exhaustion_hazard = snap.exhaustion * (snap.burst_failure + 0.35 * snap.liquidity_vacuum)
         absorption_hazard = snap.absorption_down - snap.absorption_up
         return clamp(
@@ -221,8 +229,9 @@ class BayesianEvidenceFusion:
         conflict = 1.0 - conflict
         vol_unc = clamp(snap.regime_volatility + snap.jump_intensity + snap.liquidity_vacuum, 0.0, 3.0) / 3.0
         stale = snap.stale_penalty
-        boundary = clamp(boundary_density * max(1e-8, snap.realized_vol) * 30.0, 0.0, 1.0)
-        kalman = clamp(filtered_var / max(1e-8, snap.realized_vol * snap.realized_vol), 0.0, 1.0)
+        price_vol_per_s = max(1e-8, snap.truth_price) * max(1e-8, snap.realized_vol)
+        boundary = clamp(boundary_density * price_vol_per_s * 30.0, 0.0, 1.0)
+        kalman = clamp(filtered_var / (price_vol_per_s * price_vol_per_s), 0.0, 1.0)
         return clamp(0.23 * conflict + 0.22 * vol_unc + 0.22 * stale + 0.20 * boundary + 0.13 * kalman, 0.0, 0.98)
 
     def _continuation_reversal_probabilities(
