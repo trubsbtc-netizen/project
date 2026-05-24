@@ -257,6 +257,8 @@ class DecisionEngine:
             parts.append(f"LOCK_WAIT({decorrelation_reason})")
         elif entry_pullback_wait:
             parts.append(f"ENTRY_WAIT({decorrelation_reason})")
+        elif decorrelation_reason.startswith("direction_conflict"):
+            parts.append(f"DIR_CONFLICT({decorrelation_reason})")
         elif decorrelation_reason.startswith("round_entry_already_taken"):
             parts.append(f"ROUND_SKIP({decorrelation_reason})")
         elif decorrelation_was_skipped:
@@ -328,6 +330,72 @@ class DecisionEngine:
         probability = p_up if direction == Direction.UP else p_down
         market_price = market_price_up if direction == Direction.UP else market_price_down
         return direction, probability, market_price or 0.5, probability - 0.5, (probability - 0.5) * 10000.0
+
+    @staticmethod
+    def _logit(probability: float) -> float:
+        p = float(np.clip(probability, 0.001, 0.999))
+        return float(np.log(p / (1.0 - p)))
+
+    def _trusted_signal_direction(
+        self,
+        settlement_forecast: SettlementForecast,
+    ) -> tuple[Optional[Direction], str]:
+        if settlement_forecast.round_direction_locked:
+            if settlement_forecast.round_direction in {Direction.UP, Direction.DOWN}:
+                return settlement_forecast.round_direction, "round_lock"
+
+        evidence: list[tuple[str, Direction, float]] = []
+
+        min_obs_log_odds = float(getattr(self.config, "observation_min_abs_log_odds", 0.20))
+        min_obs_confidence = float(getattr(self.config, "observation_min_direction_confidence", 0.35))
+        if (
+            settlement_forecast.observation_ready
+            and settlement_forecast.observation_valid
+            and settlement_forecast.observation_p_up is not None
+        ):
+            obs_log_odds = self._logit(settlement_forecast.observation_p_up)
+            if (
+                abs(obs_log_odds) >= min_obs_log_odds
+                and settlement_forecast.observation_confidence >= min_obs_confidence
+            ):
+                evidence.append(
+                    (
+                        "obs",
+                        Direction.UP if obs_log_odds > 0.0 else Direction.DOWN,
+                        abs(obs_log_odds) * settlement_forecast.observation_confidence,
+                    )
+                )
+
+        min_tech_log_odds = float(getattr(self.config, "round_direction_min_abs_log_odds", 0.35))
+        min_tech_confidence = float(getattr(self.config, "directional_min_confidence", 0.35))
+        min_tech_consensus = float(getattr(self.config, "technical_momentum_min_consensus", 0.62))
+        if settlement_forecast.technical_valid:
+            tech_log_odds = float(settlement_forecast.technical_log_odds)
+            if (
+                np.isfinite(tech_log_odds)
+                and abs(tech_log_odds) >= min_tech_log_odds
+                and settlement_forecast.technical_confidence >= min_tech_confidence
+                and settlement_forecast.technical_consensus_score >= min_tech_consensus
+            ):
+                evidence.append(
+                    (
+                        "tech",
+                        Direction.UP if tech_log_odds > 0.0 else Direction.DOWN,
+                        abs(tech_log_odds)
+                        * settlement_forecast.technical_confidence
+                        * settlement_forecast.technical_consensus_score,
+                    )
+                )
+
+        if not evidence:
+            return None, ""
+
+        directions = {direction for _, direction, _ in evidence}
+        if len(directions) > 1:
+            return None, "signal_conflict"
+
+        source, direction, _score = max(evidence, key=lambda item: item[2])
+        return direction, source
 
     def _forecast_confidence_for_reject(
         self,
@@ -746,6 +814,42 @@ class DecisionEngine:
             market_price_up,
             market_price_down,
         )
+        trusted_direction, trusted_source = self._trusted_signal_direction(settlement_forecast)
+        if (
+            bool(getattr(self.config, "trade_expected_direction_only", True))
+            and not bool(getattr(self.config, "allow_direction_flip_entries", False))
+            and trusted_direction in {Direction.UP, Direction.DOWN}
+            and direction in {Direction.UP, Direction.DOWN}
+            and direction != trusted_direction
+        ):
+            confidence = self._forecast_confidence_for_reject(settlement_forecast)
+            conflict_reason = (
+                "direction_conflict("
+                f"signal={trusted_direction.value},"
+                f"trade={direction.value},"
+                f"source={trusted_source})"
+            )
+            reason = self._build_reason(
+                settlement_forecast=settlement_forecast,
+                execution_estimate=execution_estimate,
+                risk_state=risk_state,
+                signal_type=SignalType.SUPPRESSED,
+                confidence=confidence,
+                should_trade=False,
+                decorrelation_passed=False,
+                decorrelation_reason=conflict_reason,
+            )
+            return self._rejected_decision(
+                timestamp=timestamp,
+                settlement_forecast=settlement_forecast,
+                execution_estimate=execution_estimate,
+                regime_estimate=regime_estimate,
+                market_price_up=market_price_up,
+                market_price_down=market_price_down,
+                confidence=confidence,
+                reason=reason,
+                is_dry_run=is_dry_run,
+            )
         if direction == Direction.NEUTRAL:
             reason = self._build_reason(
                 settlement_forecast=settlement_forecast,

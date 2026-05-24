@@ -2410,32 +2410,51 @@ class TradingBot:
         if not observation_signal.is_valid:
             return None
 
-        evidences: List[Tuple[str, float, float]] = []
+        evidences: List[Tuple[str, float, float, float]] = []
         obs_log_odds = self._prob_logit(observation_signal.p_up)
         min_abs_log_odds = float(getattr(self.config, "round_direction_min_abs_log_odds", 0.50))
-        min_obs_confidence = float(np.clip(
-            getattr(self.config, "round_direction_min_confidence", 0.68) * 0.92,
-            0.60,
-            0.70,
+        min_lock_confidence = float(getattr(self.config, "round_direction_min_confidence", 0.68))
+        obs_sample_weight = float(np.clip(
+            float(observation_signal.effective_sample_size)
+            / (float(observation_signal.effective_sample_size) + 18.0),
+            0.0,
+            1.0,
         ))
-        if abs(obs_log_odds) < min_abs_log_odds * 0.75:
-            return None
-        if observation_signal.confidence < min_obs_confidence:
-            return None
-
         obs_weight = float(np.clip(
-            0.25 + 0.75 * observation_signal.confidence * observation_signal.validation_score,
-            0.10,
-            1.00,
+            0.08
+            + 0.52
+            * float(observation_signal.confidence)
+            * float(observation_signal.validation_score)
+            * obs_sample_weight,
+            0.05,
+            0.60,
         ))
-        evidences.append(("obs", obs_log_odds, obs_weight))
+        if np.isfinite(obs_log_odds):
+            evidences.append((
+                "obs",
+                obs_log_odds,
+                obs_weight,
+                float(observation_signal.confidence),
+            ))
 
-        obs_direction_sign = float(np.sign(obs_log_odds))
+        obs_direction_sign = (
+            float(np.sign(obs_log_odds))
+            if (
+                np.isfinite(obs_log_odds)
+                and abs(obs_log_odds) >= min_abs_log_odds * 0.50
+                and float(observation_signal.confidence) >= 0.30
+            )
+            else 0.0
+        )
         if (
             technical_signal is not None
             and technical_signal.is_valid
         ):
-            tech_log_odds = float(technical_signal.log_odds)
+            tech_log_odds = float(np.clip(
+                technical_signal.log_odds,
+                -getattr(self.config, "technical_momentum_max_log_odds", 2.2),
+                getattr(self.config, "technical_momentum_max_log_odds", 2.2),
+            ))
             tech_sign = float(np.sign(tech_log_odds))
             technical_opposes = (
                 obs_direction_sign != 0.0
@@ -2449,16 +2468,25 @@ class TradingBot:
             if technical_signal.conflict_score <= float(
                 getattr(self.config, "round_direction_max_technical_conflict", 0.35)
             ):
-                tech_weight = float(np.clip(
-                    0.15
-                    + 0.65
-                    * technical_signal.confidence
-                    * technical_signal.validation_score
-                    * technical_signal.consensus_score,
-                    0.05,
-                    0.80,
+                tech_quality = float(np.clip(
+                    float(technical_signal.confidence)
+                    * float(technical_signal.validation_score)
+                    * float(technical_signal.consensus_score)
+                    * (1.0 - float(technical_signal.conflict_score)),
+                    0.0,
+                    1.0,
                 ))
-                evidences.append(("tech", tech_log_odds, tech_weight))
+                tech_weight = float(np.clip(
+                    0.10 + 0.78 * tech_quality,
+                    0.08,
+                    0.90,
+                ))
+                evidences.append((
+                    "tech",
+                    tech_log_odds,
+                    tech_weight,
+                    float(technical_signal.confidence),
+                ))
 
         barrier_probability, barrier_confidence, barrier_z = self._barrier_lock_probability(
             btc_price=btc_price,
@@ -2480,13 +2508,13 @@ class TradingBot:
             if barrier_opposes:
                 return None
             barrier_weight = float(np.clip(0.08 + 0.32 * barrier_confidence, 0.05, 0.40))
-            evidences.append(("barrier", barrier_log_odds, barrier_weight))
+            evidences.append(("barrier", barrier_log_odds, barrier_weight, float(barrier_confidence)))
 
-        total_weight = sum(weight for _, _, weight in evidences)
+        total_weight = sum(weight for _, _, weight, _ in evidences)
         if total_weight <= 1.0e-12:
             return None
         locked_log_odds = float(
-            sum(log_odds * weight for _, log_odds, weight in evidences) / total_weight
+            sum(log_odds * weight for _, log_odds, weight, _ in evidences) / total_weight
         )
         abs_log_odds = abs(locked_log_odds)
         if abs_log_odds < min_abs_log_odds:
@@ -2496,27 +2524,32 @@ class TradingBot:
         direction_sign = 1.0 if direction == Direction.UP else -1.0
         same_side_weight = sum(
             weight
-            for _, log_odds, weight in evidences
+            for _, log_odds, weight, _ in evidences
             if np.sign(log_odds) == direction_sign or abs(log_odds) < 1.0e-9
         )
         agreement = float(np.clip(same_side_weight / total_weight, 0.0, 1.0))
         magnitude = float(np.clip(abs_log_odds / 2.0, 0.0, 1.0))
         validation = float(observation_signal.validation_score)
+        evidence_confidence = float(np.clip(
+            sum(conf * weight for _, _, weight, conf in evidences) / total_weight,
+            0.0,
+            1.0,
+        ))
         confidence = float(np.clip(
-            0.30 * agreement
-            + 0.25 * magnitude
-            + 0.25 * validation
-            + 0.20 * observation_signal.confidence,
+            0.34 * agreement
+            + 0.24 * magnitude
+            + 0.22 * validation
+            + 0.20 * evidence_confidence,
             0.0,
             0.99,
         ))
-        if confidence < float(getattr(self.config, "round_direction_min_confidence", 0.68)):
+        if confidence < min_lock_confidence:
             return None
 
         locked_probability_up = float(np.clip(self._prob_sigmoid(locked_log_odds), 0.001, 0.999))
         source_text = ",".join(
             f"{name}:{log_odds:+.2f}x{weight:.2f}"
-            for name, log_odds, weight in evidences
+            for name, log_odds, weight, _ in evidences
         )
         lock = {
             "market_slug": market_slug,

@@ -86,8 +86,11 @@ class MarketConfig:
     up_token_id: str = ""   # Will be resolved dynamically
     down_token_id: str = ""  # Will be resolved dynamically
     min_order_size: float = float(os.getenv("POLYMARKET_MIN_ORDER_SIZE", "5.0"))  # shares fallback
-    enforce_max_entry_price: bool = True
-    max_entry_price: float = 0.65
+    enforce_max_entry_price: bool = os.getenv(
+        "POLYMARKET_ENFORCE_MAX_ENTRY_PRICE",
+        "true",
+    ).lower() == "true"
+    max_entry_price: float = float(os.getenv("POLYMARKET_MAX_ENTRY_PRICE", "0.65"))
     max_position_size: float = 50.0
     price_tick: float = 0.01
     max_slippage_bps: float = 50.0
@@ -312,9 +315,15 @@ class BotConfig:
     # Strategy
     strategy_name: str = "btc_5min_directional"
     strategy_version: str = "1.0.0"
-    trade_expected_direction_only: bool = True
+    trade_expected_direction_only: bool = os.getenv(
+        "TRADE_EXPECTED_DIRECTION_ONLY",
+        "true",
+    ).lower() != "false"
     one_entry_per_round: bool = True
-    allow_direction_flip_entries: bool = False
+    allow_direction_flip_entries: bool = os.getenv(
+        "ALLOW_DIRECTION_FLIP_ENTRIES",
+        "false",
+    ).lower() == "true"
     directional_flip_min_probability: float = 0.66
     directional_min_probability: float = float(os.getenv("DIRECTIONAL_MIN_PROBABILITY", "0.55"))
     directional_min_confidence: float = float(os.getenv("DIRECTIONAL_MIN_CONFIDENCE", "0.35"))
@@ -341,10 +350,17 @@ class BotConfig:
     observation_ema_slope_min_quality: float = float(
         os.getenv("OBSERVATION_EMA_SLOPE_MIN_QUALITY", "0.38")
     )
-    round_direction_lock_enabled: bool = True
+    round_direction_lock_enabled: bool = os.getenv(
+        "ROUND_DIRECTION_LOCK_ENABLED",
+        "true",
+    ).lower() != "false"
     require_round_direction_lock_for_entry: bool = False
-    round_direction_min_confidence: float = 0.68
-    round_direction_min_abs_log_odds: float = 0.50
+    round_direction_min_confidence: float = float(
+        os.getenv("ROUND_DIRECTION_MIN_CONFIDENCE", "0.55")
+    )
+    round_direction_min_abs_log_odds: float = float(
+        os.getenv("ROUND_DIRECTION_MIN_ABS_LOG_ODDS", "0.35")
+    )
     round_direction_max_technical_conflict: float = 0.35
     round_direction_lock_conflict_log_odds: float = float(
         os.getenv("ROUND_DIRECTION_LOCK_CONFLICT_LOG_ODDS", "0.75")
