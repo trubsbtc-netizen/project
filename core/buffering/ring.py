@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Generic, TypeVar
 
 T = TypeVar("T")
@@ -76,8 +76,8 @@ class EWMoment:
 class EWCorrelation:
     dim: int
     halflife_s: float
-    mean: list[float] | None = None
-    cov: list[list[float]] | None = None
+    mean: list[float] = field(default_factory=list)
+    cov: list[list[float]] = field(default_factory=list)
     last_ts_ns: int = 0
 
     def __post_init__(self) -> None:
@@ -85,7 +85,7 @@ class EWCorrelation:
         self.cov = [[1e-6 if i == j else 0.0 for j in range(self.dim)] for i in range(self.dim)]
 
     def update(self, x: list[float], ts_ns: int) -> list[list[float]]:
-        if len(x) != self.dim or self.mean is None or self.cov is None:
+        if len(x) != self.dim:
             raise ValueError("dimension mismatch")
         if self.last_ts_ns == 0:
             self.mean = list(x)
@@ -93,16 +93,18 @@ class EWCorrelation:
             return self.cov
         dt = max(0.0, (ts_ns - self.last_ts_ns) * 1e-9)
         alpha = 1.0 - 2.0 ** (-dt / max(1e-9, self.halflife_s))
+        one_minus_alpha = 1.0 - alpha
         old_mean = self.mean[:]
         for i in range(self.dim):
-            self.mean[i] += alpha * (x[i] - self.mean[i])
+            self.mean[i] += alpha * (x[i] - old_mean[i])
         for i in range(self.dim):
             di = x[i] - old_mean[i]
+            row = self.cov[i]
             for j in range(self.dim):
                 dj = x[j] - old_mean[j]
-                self.cov[i][j] = (1.0 - alpha) * (self.cov[i][j] + alpha * di * dj)
-                if i == j:
-                    self.cov[i][j] = max(self.cov[i][j], 1e-6)
+                row[j] = one_minus_alpha * (row[j] + alpha * di * dj)
+            if row[i] < 1e-6:
+                row[i] = 1e-6
         self.last_ts_ns = ts_ns
         return self.cov
 

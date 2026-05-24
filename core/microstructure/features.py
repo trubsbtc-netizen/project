@@ -105,7 +105,9 @@ class MicrostructureEngine:
         absorption_up, absorption_down = self._absorption(taker_aggression, book_pressure, signed_distance, realized_vol)
         exhaustion = self._exhaustion(taker_aggression, flow_acceleration, queue_survival)
         burst_failure = self._burst_failure(truth, signed_distance, taker_aggression, realized_vol)
-        entropy = binary_entropy(sigmoid(1.7 * taker_aggression + 1.3 * book_pressure + 1.0 * signed_distance / max(realized_vol, 1e-8)))
+        distance_horizon_vol = max(1e-8, truth * realized_vol * (60.0 ** 0.5))
+        distance_z = clamp(signed_distance / distance_horizon_vol, -3.0, 3.0)
+        entropy = binary_entropy(sigmoid(1.7 * taker_aggression + 1.3 * book_pressure + distance_z))
         return MicrostructureSnapshot(
             ts_mono_ns=ts_ns,
             seconds_to_expiry=seconds_to_expiry,

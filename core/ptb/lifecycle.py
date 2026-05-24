@@ -115,6 +115,29 @@ class PTBProvider:
             if task.done():
                 self._inflight.pop(bucket, None)
 
+    async def bootstrap_round(self, server_time: float | None = None) -> PTBMarket:
+        bucket = deterministic_bucket(server_time)
+        cached = await self._cache.get(bucket)
+        if cached is not None:
+            return cached
+        if self._config.ptb_mode == "static":
+            return await self._fetch_and_install(
+                bucket,
+                allow_http=False,
+                timeout_s=self._config.startup_bootstrap_timeout_s,
+                task_name=f"ptb.rollover.{bucket}",
+            )
+        if self._config.allow_cold_http_metadata:
+            return await self._fetch_and_install(
+                bucket,
+                allow_http=True,
+                timeout_s=self._config.startup_bootstrap_timeout_s,
+                task_name=f"ptb.rollover.{bucket}",
+            )
+        raise PTBMetadataUnavailable(
+            "rollover PTB metadata unavailable; enable ALLOW_COLD_HTTP_METADATA or use static mode"
+        )
+
     async def _fetch_and_install(self, bucket: int, *, allow_http: bool, timeout_s: float, task_name: str) -> PTBMarket:
         task = self._inflight.get(bucket)
         if task is None:

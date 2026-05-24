@@ -13,12 +13,12 @@ from core.markets.canonical import CanonicalMarketState
 from core.microstructure.features import MicrostructureEngine
 from core.ptb.lifecycle import PTBMetadataUnavailable, PTBProvider
 from core.rtds.chainlink import ChainlinkRTDSClient
-from core.runtime.clock import bucket_5m, mono_ns
+from core.runtime.clock import bucket_5m
 from core.runtime.health import HealthMonitor
 from core.runtime.supervisor import TaskSupervisor
 from core.settlement.service import SettlementService
 from core.strategy.engine import ProbabilisticStrategyEngine
-from core.types import FeedKind, PriceTick, PTBMarket, RuntimeEvent, TopOfBook, TradeTick
+from core.types import FeedKind, PriceTick, PTBMarket, RuntimeEvent, SignalSource, TopOfBook, TradeTick
 from core.wallet.service import WalletService
 from core.websocket.exchange_feeds import BinanceFeed, CoinbaseFeed
 from core.websocket.polymarket import MarketSubscriptionState, PolymarketMarketFeed, PolymarketUserFeed
@@ -148,26 +148,34 @@ class InstitutionalBTCPolyBot:
         self.counters.rollovers += 1
 
     async def _rollover_once(self) -> bool:
-        market = await self.ptb.get_cached_round(time.time())
+        now = time.time()
+        market = await self.ptb.get_cached_round(now)
         if market is None:
-            return False
+            market = await self.ptb.bootstrap_round(now)
         await self._install_ptb_market(market)
         return True
 
     async def _rollover_loop(self) -> None:
         active_bucket = await self.market_state.current_bucket()
+        failed_bucket: int | None = None
         while True:
             await asyncio.sleep(0.2)
             current_bucket = bucket_5m()
-            if current_bucket != active_bucket:
-                try:
-                    rolled = await self._rollover_once()
-                except PTBMetadataUnavailable:
-                    rolled = False
-                if rolled:
-                    active_bucket = current_bucket
-                else:
-                    await asyncio.sleep(1.0)
+            if current_bucket == active_bucket:
+                continue
+            if current_bucket == failed_bucket:
+                await asyncio.sleep(2.0)
+                continue
+            try:
+                rolled = await self._rollover_once()
+            except PTBMetadataUnavailable as exc:
+                logger.warning("rollover failed for bucket=%s: %s", current_bucket, exc)
+                rolled = False
+            if rolled:
+                active_bucket = current_bucket
+                failed_bucket = None
+            else:
+                failed_bucket = current_bucket
 
     async def _event_processor(self) -> None:
         while True:
@@ -244,11 +252,11 @@ class InstitutionalBTCPolyBot:
             await asyncio.sleep(1.0)
             archive = await self.market_state.archive()
             current = await self.market_state.current()
-            states = list(archive.values()) + ([current] if current is not None else [])
+            states = list(archive.values())
+            if current is not None:
+                states.append(current)
             now = time.time()
             for state in states:
-                if state is None:
-                    continue
                 market = state.market
                 if market.condition_id in self._settlement_seen or now < market.close_ts + 2.0:
                     continue
@@ -295,7 +303,7 @@ class InstitutionalBTCPolyBot:
         await self._put_event(RuntimeEvent(FeedKind.CHAINLINK, tick, tick.recv_mono_ns))
 
     async def _on_exchange_event(self, event: TopOfBook | TradeTick) -> None:
-        kind = FeedKind.BINANCE if getattr(event, "source", None).value == "binance" else FeedKind.COINBASE
+        kind = FeedKind.BINANCE if event.source is SignalSource.BINANCE else FeedKind.COINBASE
         await self._put_event(RuntimeEvent(kind, event, event.recv_mono_ns))
 
     async def _on_poly_event(self, event: TopOfBook | TradeTick) -> None:

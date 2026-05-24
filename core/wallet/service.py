@@ -5,11 +5,7 @@ from dataclasses import dataclass
 
 from core.config import ContractConfig, PolymarketConfig
 from core.settlement.contracts import ERC20_ABI, ERC1155_ABI
-
-try:
-    from web3 import Web3
-except ImportError:  # pragma: no cover
-    Web3 = None
+from core.transport.web3_provider import build_web3
 
 
 @dataclass(slots=True, frozen=True)
@@ -28,7 +24,7 @@ class WalletService:
     def __init__(self, poly: PolymarketConfig, contracts: ContractConfig) -> None:
         self._poly = poly
         self._contracts = contracts
-        self._web3 = self._build_web3()
+        self._web3 = build_web3(contracts)
         self._erc20 = None
         self._erc1155 = None
         if self._web3 is not None:
@@ -40,15 +36,6 @@ class WalletService:
                 address=self._web3.to_checksum_address(contracts.conditional_tokens),
                 abi=ERC1155_ABI,
             )
-
-    def _build_web3(self):
-        if Web3 is None:
-            return None
-        if self._contracts.polygon_ws_rpc:
-            return Web3(Web3.WebsocketProvider(self._contracts.polygon_ws_rpc, websocket_timeout=8))
-        if self._contracts.allow_http_rpc and self._contracts.polygon_http_rpc:
-            return Web3(Web3.HTTPProvider(self._contracts.polygon_http_rpc, request_kwargs={"timeout": 8}))
-        return None
 
     @property
     def owner(self) -> str:
