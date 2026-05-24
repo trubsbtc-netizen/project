@@ -177,7 +177,7 @@ class DecisionEngine:
         elif continuation_prob > self.CONTINUATION_DOMINANCE_THRESHOLD:
             return SignalType.CONTINUATION
 
-        if settlement_forecast is not None and settlement_forecast.observation_valid:
+        if settlement_forecast is not None and settlement_forecast.observation_ready:
             return SignalType.OBSERVATION
 
         # Default: no dominant signal
@@ -426,15 +426,6 @@ class DecisionEngine:
                     hold_seconds,
                     f"observation_wait(obs={settlement_forecast.observation_seconds:.1f}s)",
                 )
-            if not settlement_forecast.observation_valid:
-                self._direction_confirmation_state.pop(key, None)
-                obs_reason = (settlement_forecast.observation_reason or "observation_invalid")
-                obs_reason = obs_reason.replace("|", "/").replace(" ", "_")[:80]
-                return (
-                    False,
-                    hold_seconds,
-                    f"observation_invalid({obs_reason})",
-                )
 
         if hold_seconds <= 0.0 or not market_key:
             self._direction_confirmation_state.pop(key, None)
@@ -453,7 +444,7 @@ class DecisionEngine:
             self._direction_confirmation_state[key] = state
         elapsed = now - float(state["started_at"])
 
-        if should_execute and settlement_forecast.observation_valid and elapsed < hold_seconds:
+        if should_execute and settlement_forecast.observation_ready and elapsed < hold_seconds:
             remaining = max(0.0, hold_seconds - elapsed)
             return (
                 False,
@@ -461,7 +452,7 @@ class DecisionEngine:
                 f"post_observation_hold({direction.value},{elapsed:.1f}<{hold_seconds:.1f}s,expected={expected_direction.value})",
             )
 
-        if should_execute and settlement_forecast.observation_valid:
+        if should_execute and settlement_forecast.observation_ready:
             state["confirmed_at"] = now
             return should_execute, 0.0, ""
 

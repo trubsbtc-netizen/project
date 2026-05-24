@@ -537,10 +537,13 @@ class SettlementForecaster:
             reject_reason = "no_directional_side"
 
         probability = float(np.clip(selected_probability, 0.001, 0.999))
+        quality = float(np.clip(confidence, 0.0, 0.99))
+        confidence_discount = 1.0 - 0.35 * quality
+        adaptive_probability_floor = 0.5 + (min_edge_bps / 10000.0) * confidence_discount
         min_directional_probability = float(np.clip(
             max(
                 getattr(self.config, "directional_min_probability", 0.62),
-                0.5 + min_edge_bps / 10000.0,
+                adaptive_probability_floor,
             ),
             0.5,
             0.99,

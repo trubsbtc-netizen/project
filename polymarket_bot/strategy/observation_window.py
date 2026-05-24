@@ -934,15 +934,15 @@ class ObservationWindowStrategy:
         ]
         validation_score = float(np.exp(np.mean(np.log(validation_components))))
 
-        invalid_reasons = []
+        data_invalid_reasons = []
         if sample_count < adaptive_min_samples:
-            invalid_reasons.append(f"samples<{adaptive_min_samples}")
+            data_invalid_reasons.append(f"samples<{adaptive_min_samples}")
         if coverage_ratio < self.min_coverage:
-            invalid_reasons.append(f"coverage<{self.min_coverage:.2f}")
+            data_invalid_reasons.append(f"coverage<{self.min_coverage:.2f}")
         if max_gap > self.max_gap_seconds:
-            invalid_reasons.append(f"gap>{self.max_gap_seconds:.1f}s")
+            data_invalid_reasons.append(f"gap>{self.max_gap_seconds:.1f}s")
         if validation_score < self.min_validation_score:
-            invalid_reasons.append(f"validation<{self.min_validation_score:.2f}")
+            data_invalid_reasons.append(f"validation<{self.min_validation_score:.2f}")
 
         prior_sigma = self._prior_sigma(volatility_estimate)
         ema_slope = self._multi_speed_ema_slope_signal(
@@ -1055,14 +1055,15 @@ class ObservationWindowStrategy:
         selected_probability = max(p_up, p_down)
         required_log_odds = self.min_abs_log_odds
         min_probability = self._sigmoid(required_log_odds)
+        directional_reasons = []
         if direction_log_odds < required_log_odds:
-            invalid_reasons.append(f"edge<{min_probability:.3f}")
+            directional_reasons.append(f"edge<{min_probability:.3f}")
         if (
             int(ema_slope["span_count"]) >= 3
             and float(ema_slope["turning_pressure"]) > 0.82
             and selected_probability < 0.72
         ):
-            invalid_reasons.append("ema_turning>0.82")
+            directional_reasons.append("ema_turning>0.82")
         if (
             bool(ema_slope["is_valid"])
             and np.sign(ema_log_odds) != 0.0
@@ -1072,30 +1073,33 @@ class ObservationWindowStrategy:
             and abs(pre_ema_terminal_log_odds) >= 0.35
             and ema_agreement < 0.74
         ):
-            invalid_reasons.append("ema_terminal_conflict")
+            directional_reasons.append("ema_terminal_conflict")
         if confidence < self.min_direction_confidence:
-            invalid_reasons.append(f"conf<{self.min_direction_confidence:.2f}")
+            directional_reasons.append(f"conf<{self.min_direction_confidence:.2f}")
 
-        is_valid = len(invalid_reasons) == 0
+        is_valid = len(data_invalid_reasons) == 0
         candidate_direction = (
             Direction.UP
-            if p_up >= p_down and direction_log_odds >= required_log_odds
+            if p_up >= p_down and p_up > 0.5
             else Direction.DOWN
-            if p_down > p_up and direction_log_odds >= required_log_odds
+            if p_down > p_up and p_down > 0.5
             else Direction.NEUTRAL
         )
         direction = candidate_direction if is_valid else Direction.NEUTRAL
+        direction_state = "trade_ready" if not directional_reasons else "watch"
         reason = (
-            f"valid(n_eff={n_eff:.1f},z={terminal_z_out:+.2f},"
+            f"valid({direction_state},n_eff={n_eff:.1f},z={terminal_z_out:+.2f},"
             f"cutoff={cutoff_price:.2f},tau0={cutoff_tau:.0f},"
+            f"edge_min={min_probability:.3f},"
             f"ema_w={ema_weight:.2f},ev={float(ema_slope['velocity']):+.2f},"
             f"ea={float(ema_slope['acceleration']):+.2f},"
             f"esa={float(ema_slope['spread_acceleration']):+.2f},"
             f"ec={float(ema_slope['curvature']):+.2f},"
             f"etp={float(ema_slope['turning_pressure']):.2f},"
-            f"p={selected_probability:.3f})"
+            f"p={selected_probability:.3f}"
+            f"{',gate=' + '/'.join(directional_reasons) if directional_reasons else ''})"
             if is_valid
-            else ",".join(invalid_reasons)
+            else ",".join(data_invalid_reasons)
         )
         signal = ObservationSignal(
             timestamp=now,
@@ -1115,7 +1119,7 @@ class ObservationWindowStrategy:
             direction=direction,
             p_up=float(p_up),
             p_down=float(p_down),
-            confidence=confidence if is_valid else min(confidence, 0.25),
+            confidence=float(confidence),
             validation_score=float(validation_score),
             uncertainty=uncertainty,
             terminal_z_score=float(terminal_z_out),

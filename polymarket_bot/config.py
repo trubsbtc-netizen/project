@@ -316,8 +316,8 @@ class BotConfig:
     one_entry_per_round: bool = True
     allow_direction_flip_entries: bool = False
     directional_flip_min_probability: float = 0.66
-    directional_min_probability: float = 0.62
-    directional_min_confidence: float = 0.55
+    directional_min_probability: float = float(os.getenv("DIRECTIONAL_MIN_PROBABILITY", "0.55"))
+    directional_min_confidence: float = float(os.getenv("DIRECTIONAL_MIN_CONFIDENCE", "0.35"))
     post_observation_confirmation_seconds: float = float(
         os.getenv("POST_OBSERVATION_CONFIRMATION_SECONDS", "0.0")
     )
@@ -327,8 +327,8 @@ class BotConfig:
     observation_min_coverage: float = float(os.getenv("OBSERVATION_MIN_COVERAGE", "0.86"))
     observation_max_gap_seconds: float = float(os.getenv("OBSERVATION_MAX_GAP_SECONDS", "6.0"))
     observation_min_validation_score: float = float(os.getenv("OBSERVATION_MIN_VALIDATION_SCORE", "0.60"))
-    observation_min_abs_log_odds: float = 0.45
-    observation_min_direction_confidence: float = 0.58
+    observation_min_abs_log_odds: float = float(os.getenv("OBSERVATION_MIN_ABS_LOG_ODDS", "0.20"))
+    observation_min_direction_confidence: float = float(os.getenv("OBSERVATION_MIN_DIRECTION_CONFIDENCE", "0.35"))
     observation_ema_slope_enabled: bool = os.getenv(
         "OBSERVATION_EMA_SLOPE_ENABLED", "true"
     ).lower() == "true"
