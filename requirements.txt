@@ -1,7 +1,25 @@
-websockets>=12.0
-orjson>=3.10.0
-web3>=6.15.0
-eth-account>=0.10.0
-py-clob-client>=0.23.0
-rich>=13.0.0
+# Polymarket BTC Directional Trading Bot
+#
+# Core dependencies
+# ==================
 
+# --- Numerics & Statistics ---
+numpy>=1.24.0,<2.0.0
+scipy>=1.10.0,<2.0.0
+
+# --- Async HTTP & WebSocket ---
+aiohttp>=3.9.0,<4.0.0
+
+# --- Ethereum / Polymarket ---
+py-clob-client-v2>=1.0.0,<2.0.0
+web3>=6.0.0,<7.0.0
+eth-account>=0.10.0,<0.11.0
+
+# --- Environment ---
+python-dotenv>=1.0.0,<2.0.0
+rich>=13.7.0,<14.0.0
+
+# --- Development & Testing (optional) ---
+# pytest>=7.4.0
+# pytest-asyncio>=0.21.0
+# mypy>=1.5.0
