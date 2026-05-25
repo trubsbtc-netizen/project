@@ -1,0 +1,12 @@
+{
+  "risk": {
+    "session_pnl_usdc": "-11.1089783705000838",
+    "session_trades": 16,
+    "consecutive_losses": 3,
+    "total_exposure_usdc": "0",
+    "circuit_state": "OPEN",
+    "kill_switch_active": false
+  },
+  "positions": {},
+  "_saved_at": 1779714264.9579473
+}
