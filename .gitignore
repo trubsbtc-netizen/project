@@ -1,4 +1,16 @@
 .env
+.env.*
+!.env.example
+
 __pycache__/
+*.py[cod]
+*$py.class
 *.pyc
+.pytest_cache/
+
 logs/
+*.log
+polymarket_trade_history.jsonl
+
+validated_signal_formulas.py
+*.jsonl

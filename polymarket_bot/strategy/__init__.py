@@ -1,0 +1,2 @@
+"""Strategy-layer signal engines."""
+

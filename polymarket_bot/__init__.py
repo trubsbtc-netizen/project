@@ -1,0 +1,1 @@
+"""Polymarket BTC 5-minute directional trading bot."""
