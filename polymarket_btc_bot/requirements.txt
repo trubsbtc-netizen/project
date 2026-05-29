@@ -1,0 +1,97 @@
+# Polymarket BTC-UP/DOWN-5M Trading Bot - Requirements
+
+## Python Version
+- Python 3.12+ required
+
+## Dependencies
+
+### Core
+- aiohttp>=3.9.0 - Async HTTP client for DoH and WebSockets
+- PyYAML>=6.0 - Configuration parsing
+
+### Optional (for enhanced functionality)
+- orjson>=3.9.0 - Faster JSON parsing (fallback to stdlib json)
+- uvloop>=0.19.0 - Faster asyncio event loop on Linux
+
+## Installation
+
+```bash
+# Create virtual environment
+python3.12 -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Or install individually
+pip install aiohttp pyyaml
+```
+
+## Usage
+
+```bash
+# Run with default config
+python main.py
+
+# Run with custom config
+python main.py --config /path/to/custom_config.yaml
+```
+
+## Configuration
+
+Edit `config.yaml` to customize:
+- Trading thresholds and limits
+- Signal weights
+- Network settings (DoH providers, timeouts)
+- Polymarket subscription parameters
+- External feed configurations
+- Logging and metrics settings
+
+## Project Structure
+
+```
+polymarket_btc_bot/
+├── main.py              # Entry point and bot orchestrator
+├── doh_resolver.py      # DNS-over-HTTPS resolver
+├── websocket_manager.py # WebSocket connection management
+├── orderbook.py         # Orderbook state management
+├── signals.py           # Signal computation engine
+├── config.yaml          # Configuration file
+├── ARCHITECTURE.md      # Detailed architecture documentation
+├── README.md            # This file
+└── requirements.txt     # Python dependencies
+```
+
+## Key Features
+
+1. **DNS-over-HTTPS**: All DNS queries use DoH with multiple provider failover
+2. **WebSocket Management**: Automatic reconnection, heartbeat monitoring, state recovery
+3. **Orderbook Sync**: Deterministic snapshot + incremental update model with sequence validation
+4. **Multi-Signal Engine**: Orderflow, spread, liquidity, momentum, external confirmation
+5. **Confidence Scoring**: Weighted signal combination with confidence calibration
+6. **Risk Controls**: Circuit breakers, position limits, daily loss limits
+7. **Production Ready**: Structured logging, metrics collection, graceful shutdown
+
+## Important Notes
+
+### Before Production Use
+
+1. **API Credentials**: Add your Polymarket API credentials to the configuration
+2. **Market IDs**: Update placeholder asset IDs with actual market identifiers
+3. **RTDS Integration**: Configure RTDS endpoint if available
+4. **Testing**: Run in dry-run mode first (`trading.dry_run: true`)
+5. **Monitoring**: Set up alerting for bot health and PnL tracking
+
+### Risk Warnings
+
+- This bot trades real capital when not in dry-run mode
+- Binary options are high-risk instruments
+- Past performance does not guarantee future results
+- Always start with small position sizes
+- Monitor the bot continuously during initial deployment
+
+## Support
+
+For issues or questions, refer to:
+- ARCHITECTURE.md for detailed system design
+- Polymarket documentation: https://docs.polymarket.com/
