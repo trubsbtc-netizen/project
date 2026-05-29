@@ -1,0 +1,113 @@
+# Polymarket BTC-UP/DOWN-5M Trading Bot Configuration
+
+trading:
+  enabled: true
+  dry_run: false  # Set to true for paper trading
+  
+  # Probability thresholds
+  entry_threshold: 0.60  # Minimum P(direction) to enter
+  exit_threshold: 0.45   # Exit if P falls below this
+  confidence_threshold: 0.50  # Minimum confidence score
+  
+  # Position management
+  max_position_size_pct: 2.0  # Kelly fraction cap
+  max_concurrent_positions: 3
+  daily_loss_limit_pct: 5.0
+  max_drawdown_pct: 10.0
+  
+  # Timing constraints
+  min_time_to_expiry_seconds: 30
+  cooldown_after_loss_seconds: 60
+  max_loss_streak: 3
+
+signals:
+  # Signal weights (will be normalized)
+  orderflow_weight: 0.30
+  spread_weight: 0.15
+  liquidity_weight: 0.20
+  momentum_weight: 0.20
+  external_price_weight: 0.15
+  
+  # Signal parameters
+  momentum_lookback_periods: 5
+  volume_ma_periods: 20
+  volatility_lookback_periods: 10
+  
+  # Decay parameters
+  signal_decay_lambda: 0.1
+  confidence_base: 0.5
+
+risk:
+  # Circuit breakers
+  halt_on_spread_pct: 5.0
+  max_price_divergence_pct: 2.0
+  heartbeat_timeout_seconds: 30
+  
+  # Rate limiting
+  max_orders_per_minute: 60
+  max_api_calls_per_second: 10
+
+network:
+  # DNS-over-HTTPS providers (priority order)
+  doh_providers:
+    - url: "https://cloudflare-dns.com/dns-query"
+      name: "cloudflare"
+    - url: "https://dns.google/dns-query"
+      name: "google"
+    - url: "https://dns.quad9.net/dns-query"
+      name: "quad9"
+  
+  dns_cache_ttl_seconds: 300
+  connection_timeout_seconds: 10
+  read_timeout_seconds: 30
+  
+  # Reconnect settings
+  reconnect_base_delay_ms: 100
+  reconnect_max_delay_ms: 30000
+  reconnect_jitter_ms: 100
+
+polymarket:
+  # WebSocket endpoints
+  orderbook_ws_url: "wss://bookfeed.polymarket.com"
+  events_ws_url: "wss://events.polymarket.com"
+  
+  # REST API
+  rest_api_url: "https://clob.polymarket.com"
+  
+  # Market filters
+  target_category: "crypto"
+  market_name_pattern: "BTC.*5M"  # Regex pattern for BTC 5-minute markets
+  
+  # Subscription settings
+  subscribe_trades: true
+  subscribe_book_snapshots: true
+  subscribe_price_changes: true
+
+external_feeds:
+  binance:
+    enabled: true
+    ws_url: "wss://stream.binance.com:9443/ws/btcusdt@trade/btcusdt@depth20@100ms"
+    price_tolerance_pct: 2.0
+    
+  coinbase:
+    enabled: true
+    ws_url: "wss://ws-feed.exchange.coinbase.com"
+    product_id: "BTC-USD"
+    price_tolerance_pct: 2.0
+
+rtds:
+  enabled: true
+  ws_url: "wss://rtds.polymarket.com"  # Hypothetical RTDS endpoint
+  heartbeat_interval_seconds: 10
+  
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/polymarket_bot.log"
+  max_size_mb: 100
+  backup_count: 5
+  
+metrics:
+  enabled: true
+  export_path: "metrics/metrics.json"
+  export_interval_seconds: 60
