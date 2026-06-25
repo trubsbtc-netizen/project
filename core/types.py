@@ -79,6 +79,34 @@ class ConnectionState(Enum):
     FAILED        = auto()
 
 
+# ─────────────────────────── Time Window Mixin ───────────────────────────
+
+class TimeWindowMixin:
+    """Shared time-window properties for classes with start_time / end_time."""
+    start_time: int
+    end_time:   int
+
+    @property
+    def time_remaining(self) -> float:
+        return max(0.0, self.end_time - time.time())
+
+    @property
+    def pct_elapsed(self) -> float:
+        total = self.end_time - self.start_time
+        if total <= 0:
+            return 1.0
+        elapsed = time.time() - self.start_time
+        return min(1.0, max(0.0, elapsed / total))
+
+    @property
+    def is_near_expiry(self) -> bool:
+        return 0 < self.time_remaining < 60.0
+
+    @property
+    def is_expired(self) -> bool:
+        return time.time() >= self.end_time
+
+
 # ─────────────────────────── Price Levels ───────────────────────────
 
 @dataclass(frozen=True)
@@ -181,7 +209,7 @@ class OrderbookState:
 # ─────────────────────────── Market Info ───────────────────────────
 
 @dataclass
-class MarketTokenPair:
+class MarketTokenPair(TimeWindowMixin):
     """Represents the UP/DOWN token pair for a BTC 5M market."""
     condition_id: str
     up_token_id:  str
@@ -192,26 +220,6 @@ class MarketTokenPair:
     end_time:     int          # unix timestamp (start + 300 seconds)
     question:     str
     slug:         str
-
-    @property
-    def time_remaining(self) -> float:
-        return max(0.0, self.end_time - time.time())
-
-    @property
-    def pct_elapsed(self) -> float:
-        total = self.end_time - self.start_time
-        if total <= 0:
-            return 1.0
-        elapsed = time.time() - self.start_time
-        return min(1.0, max(0.0, elapsed / total))
-
-    @property
-    def is_near_expiry(self) -> bool:
-        return self.time_remaining < 60.0
-
-    @property
-    def is_expired(self) -> bool:
-        return time.time() >= self.end_time
 
 
 # ─────────────────────────── Signal / Probability ───────────────────────────
