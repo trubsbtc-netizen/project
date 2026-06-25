@@ -281,8 +281,8 @@ class WalletMaintenance:
             try:
                 response = relayer.deploy_deposit_wallet()
                 response.wait()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Deposit wallet deployment failed (may already exist): %s", exc)
             return wallet
 
         try:

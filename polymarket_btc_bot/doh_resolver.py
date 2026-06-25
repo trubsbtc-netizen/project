@@ -6,6 +6,7 @@ Uses DoH to prevent DNS poisoning and ensure consistent resolution.
 """
 
 import asyncio
+import logging
 import time
 import hashlib
 from dataclasses import dataclass, field
@@ -13,6 +14,8 @@ from typing import Optional, Dict, List, Any
 from collections import OrderedDict
 import aiohttp
 import struct
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -349,8 +352,7 @@ class DNSOverHTTPSResolver:
                     old_entry.expires_at = time.time() + self.cache_ttl_seconds
                     old_entry.provider = entry.provider
         except Exception as e:
-            # Log but don't propagate - keep using stale cache
-            pass
+            logger.debug("Cache refresh failed for %s, keeping stale entry: %s", hostname, e)
     
     async def _background_refresh_loop(self):
         """Periodically refresh cache entries approaching expiry."""
@@ -369,8 +371,8 @@ class DNSOverHTTPSResolver:
                     
             except asyncio.CancelledError:
                 break
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Background DNS refresh loop error: %s", exc)
     
     async def _health_check_loop(self):
         """Periodically check health of failed providers."""
@@ -386,8 +388,8 @@ class DNSOverHTTPSResolver:
                             
             except asyncio.CancelledError:
                 break
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("DNS health check loop error: %s", exc)
     
     def get_metrics(self) -> Dict[str, Any]:
         """Return resolver metrics."""

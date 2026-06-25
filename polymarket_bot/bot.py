@@ -518,8 +518,8 @@ class TradingBot:
                         reason="ptb_ready",
                     )
                     return
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Infra PTB cache lookup failed: %s", exc)
 
         task = self._ptb_refresh_task
         if task is not None and not task.done():
@@ -666,12 +666,12 @@ class TradingBot:
         self._last_ptb_refresh = 0.0
         try:
             self.bayesian_fusion.reset()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Bayesian fusion reset failed: %s", exc)
         try:
             self.posterior_calibrator.reset()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Posterior calibrator reset failed: %s", exc)
 
     def _invalidate_current_market_state_for_round(
         self,
@@ -762,7 +762,8 @@ class TradingBot:
         if market is not None and market.slug:
             try:
                 display_tau = self._time_to_market_settlement()
-            except Exception:
+            except Exception as exc:
+                logger.debug("TUI settlement time calculation failed: %s", exc)
                 display_tau = None
         elif state is not None and state.market_slug:
             window = self._market_window_from_slug(state.market_slug)
@@ -778,7 +779,8 @@ class TradingBot:
             try:
                 live_up_book = self.polymarket_client.get_cached_orderbook(market.token_id_up)
                 live_down_book = self.polymarket_client.get_cached_orderbook(market.token_id_down)
-            except Exception:
+            except Exception as exc:
+                logger.debug("TUI orderbook cache read failed: %s", exc)
                 live_up_book = None
                 live_down_book = None
         if state is None:
@@ -1096,8 +1098,8 @@ class TradingBot:
                         minimum_tick_size=cached_round.tick_size,
                     )
                     reason = "roller_cache"
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Roller cache lookup failed: %s", exc)
 
         if market_info is None:
             market_info = self._prefetched_markets.get(expected_slug)
@@ -1797,8 +1799,8 @@ class TradingBot:
                                 f"infra:{resolution.source.value}",
                                 actual_outcome,
                             )
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Infra PTB settlement lookup failed: slug=%s error=%s", position.market_slug, exc)
 
             local_price, local_source = self._settlement_btc_price_for_position(
                 position,
@@ -1865,8 +1867,8 @@ class TradingBot:
                             f"infra:{resolution.source.value}",
                             actual_outcome,
                         )
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Infra WS settlement resolution failed: slug=%s error=%s", position.market_slug, exc)
 
         try:
             snapshot = await self.polymarket_client.get_btc_5m_settlement_price(
@@ -2049,8 +2051,8 @@ class TradingBot:
                                 actual_outcome=actual_outcome,
                                 price_source=f"infra:{resolution.source.value}",
                             )
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Background infra settlement failed: position=%s error=%s", position_id[:32], exc)
 
             # ── Infra PTB backfill (O(1) lookup, no REST) ──────────────
             if (
@@ -2068,14 +2070,15 @@ class TradingBot:
                                 position_id[:32],
                                 cached.price,
                             )
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.debug("Infra PTB backfill lookup failed: position=%s error=%s", position_id[:32], exc)
 
             fallback_price = fallback_btc_price
             if not self._use_official_settlement_close:
                 try:
                     latest_price = self.price_feed.get_current_settlement_price()
-                except Exception:
+                except Exception as exc:
+                    logger.debug("Settlement price feed read failed: %s", exc)
                     latest_price = None
                 if latest_price is not None and latest_price > 0.0:
                     fallback_price = latest_price

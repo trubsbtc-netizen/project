@@ -96,8 +96,8 @@ class ManagedWebSocketClient:
                         resolved = await resolver.resolve(parsed_url.hostname)
                         if resolved:
                             connect_kwargs["host"] = resolved[0]["host"]
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.debug("DoH resolution failed for %s, using default DNS: %s", parsed_url.hostname, exc)
                 if parsed_url.scheme == "wss":
                     connect_kwargs["ssl"] = ssl.create_default_context()
                 async with websockets.connect(
@@ -159,7 +159,8 @@ class ManagedWebSocketClient:
                     await self.send_text("PING")
             except asyncio.CancelledError:
                 break
-            except Exception:
+            except Exception as exc:
+                logger.debug("Heartbeat ping failed on %s: %s", self.name, exc)
                 break
 
     async def send_json(self, payload: Dict[str, Any]) -> None:

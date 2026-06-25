@@ -441,8 +441,8 @@ class WebSocketStream:
         if self._ws and not self._ws.closed:
             try:
                 await self._ws.close()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("WebSocket close error during force reconnect on %s: %s", self.name, exc)
 
     # ─────────────────────────── Subscriptions ───────────────────────────
 

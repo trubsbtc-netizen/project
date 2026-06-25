@@ -121,7 +121,8 @@ class MarketDiscovery:
                     value = _safe_float(payload.get(key), 0.0)
                     if value > 0:
                         return value
-        except Exception:
+        except Exception as exc:
+            logger.debug("PTB API query failed for slug=%s: %s", slug, exc)
             return None
         return None
 
@@ -141,7 +142,8 @@ class MarketDiscovery:
                 items = payload.get("data") or payload.get("markets") or []
                 if isinstance(items, list) and items:
                     return items[0]
-        except Exception:
+        except Exception as exc:
+            logger.debug("Gamma market query failed for slug=%s: %s", slug, exc)
             return None
         return None
 
@@ -162,7 +164,8 @@ class MarketDiscovery:
                 if isinstance(items, list) and items:
                     return items[0]
                 return payload
-        except Exception:
+        except Exception as exc:
+            logger.debug("Gamma event query failed for slug=%s: %s", slug, exc)
             return None
         return None
 
@@ -178,7 +181,8 @@ class MarketDiscovery:
                 payload = await resp.json(content_type=None)
             items = payload if isinstance(payload, list) else payload.get("data") or payload.get("markets") or []
             return [item for item in items if isinstance(item, dict) and self._is_btc_5m(item)]
-        except Exception:
+        except Exception as exc:
+            logger.debug("Gamma markets list query failed: %s", exc)
             return []
 
     async def _query_clob_markets(self) -> List[Dict[str, Any]]:
@@ -190,7 +194,8 @@ class MarketDiscovery:
                 payload = await resp.json(content_type=None)
             items = payload if isinstance(payload, list) else payload.get("data") or []
             return [item for item in items if isinstance(item, dict) and self._is_btc_5m(item)]
-        except Exception:
+        except Exception as exc:
+            logger.debug("CLOB markets list query failed: %s", exc)
             return []
 
     async def _query_clob_market_by_condition(self, condition_id: str) -> Optional[Dict[str, Any]]:
@@ -201,7 +206,8 @@ class MarketDiscovery:
                     return None
                 payload = await resp.json(content_type=None)
             return payload if isinstance(payload, dict) else None
-        except Exception:
+        except Exception as exc:
+            logger.debug("CLOB market query by condition failed for %s: %s", condition_id, exc)
             return None
 
     def _parse_market_info(

@@ -245,8 +245,8 @@ async def ws_connect_robust(
                     last_data = time.monotonic()
                     try:
                         await ws.pong()
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.debug("[%s] pong reply failed: %s", tag, exc)
                 elif msg.type == aiohttp.WSMsgType.PONG:
                     last_data = time.monotonic()
                 elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.CLOSING, aiohttp.WSMsgType.CLOSE):
@@ -279,13 +279,13 @@ async def ws_connect_robust(
             if ws and not ws.closed:
                 try:
                     await ws.close()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("WebSocket close error during cleanup: %s", exc)
             if session and not session.closed:
                 try:
                     await session.close()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("HTTP session close error during cleanup: %s", exc)
 
 
 async def _ws_send_heartbeat_loop(ws: aiohttp.ClientWebSocketResponse, tag: str, interval: float, message: Any) -> None:
