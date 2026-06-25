@@ -1067,8 +1067,8 @@ class Bot:
                     self._metrics.gauge("down_book_depth", float(ds.bid_depth(5) + ds.ask_depth(5)))
             if self._market_ws:
                 self._metrics.gauge("ws_latency_ms", self._market_ws.stats.latency_ms)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Metrics update failed: %s", exc)
 
     def _print_session_stats(self) -> None:
         total_closed = self._session_wins + self._session_losses

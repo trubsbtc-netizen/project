@@ -114,7 +114,8 @@ class SettlementEngine:
                     result = response.get("result")
                     if isinstance(result, str) and result.startswith("0x"):
                         return int(result, 16)
-                except Exception:
+                except Exception as exc:
+                    logger.debug("On-chain eth_call failed for %s: %s", rpc_url, exc)
                     continue
             return None
 
@@ -166,7 +167,8 @@ class SettlementEngine:
                     return None
                 payload = await resp.json(content_type=None)
             return payload if isinstance(payload, dict) else None
-        except Exception:
+        except Exception as exc:
+            logger.debug("CLOB market query by condition failed for %s: %s", condition_id, exc)
             return None
 
     async def _query_clob_market_by_token(self, token_id: str) -> Optional[Dict[str, Any]]:
@@ -177,7 +179,8 @@ class SettlementEngine:
                     return None
                 payload = await resp.json(content_type=None)
             return payload if isinstance(payload, dict) else None
-        except Exception:
+        except Exception as exc:
+            logger.debug("CLOB market query by token failed for %s: %s", token_id, exc)
             return None
 
     async def _query_gamma_market_by_slug(self, slug: str) -> Optional[Dict[str, Any]]:
@@ -194,7 +197,8 @@ class SettlementEngine:
                 if isinstance(items, list) and items:
                     return items[0]
                 return payload
-        except Exception:
+        except Exception as exc:
+            logger.debug("Gamma market query by slug failed for %s: %s", slug, exc)
             return None
         return None
 
@@ -212,7 +216,8 @@ class SettlementEngine:
                 if isinstance(items, list) and items:
                     return items[0]
                 return payload
-        except Exception:
+        except Exception as exc:
+            logger.debug("Gamma event query by slug failed for %s: %s", slug, exc)
             return None
         return None
 

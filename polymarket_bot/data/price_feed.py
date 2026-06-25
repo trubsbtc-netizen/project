@@ -183,8 +183,8 @@ class MultiExchangePriceFeed:
                 await self._sync_from_infra()
             except asyncio.CancelledError:
                 raise
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Infra price sync error: %s", exc)
             await asyncio.sleep(0.05)
 
     async def _sync_from_infra(self) -> None:

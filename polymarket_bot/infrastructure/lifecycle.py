@@ -97,13 +97,13 @@ class LifecycleEngine:
             return
         try:
             bot._infra_ptb = engine.ptb_lifecycle
-        except AttributeError:
-            pass
+        except AttributeError as exc:
+            logger.debug("Infra wiring skipped (_infra_ptb): %s", exc)
         try:
             bot._infra_roller = engine.discovery
-        except AttributeError:
-            pass
+        except AttributeError as exc:
+            logger.debug("Infra wiring skipped (_infra_roller): %s", exc)
         try:
             bot._infra_settlement = engine.settlement
-        except AttributeError:
-            pass
+        except AttributeError as exc:
+            logger.debug("Infra wiring skipped (_infra_settlement): %s", exc)
