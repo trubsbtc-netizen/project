@@ -269,6 +269,10 @@ class TestMarketTokenPair:
         pair = self._make(start_offset=-400, duration=300)
         assert pair.is_expired
 
+    def test_expired_not_near_expiry(self) -> None:
+        pair = self._make(start_offset=-400, duration=300)
+        assert not pair.is_near_expiry
+
     def test_pct_elapsed_future(self) -> None:
         pair = self._make(start_offset=100, duration=300)
         assert pair.pct_elapsed == 0.0

@@ -14,12 +14,14 @@ import time
 from dataclasses import dataclass
 from typing import List
 
+from core.types import TimeWindowMixin
+
 CYCLE_SECONDS = 300   # 5 minutes exactly
 SLUG_PREFIX   = "btc-updown-5m"
 
 
 @dataclass(frozen=True)
-class RoundWindow:
+class RoundWindow(TimeWindowMixin):
     """Represents one 5-minute market window."""
     window_ts:   int     # Unix timestamp (start, divisible by 300)
     slug:        str     # "btc-updown-5m-{window_ts}"
@@ -28,17 +30,8 @@ class RoundWindow:
     round_number: int    # sequential round index (window_ts // 300)
 
     @property
-    def time_remaining(self) -> float:
-        return max(0.0, self.end_time - time.time())
-
-    @property
     def time_elapsed(self) -> float:
         return max(0.0, time.time() - self.start_time)
-
-    @property
-    def pct_elapsed(self) -> float:
-        elapsed = time.time() - self.start_time
-        return min(1.0, max(0.0, elapsed / CYCLE_SECONDS))
 
     @property
     def is_active(self) -> bool:
@@ -48,14 +41,6 @@ class RoundWindow:
     @property
     def is_future(self) -> bool:
         return time.time() < self.start_time
-
-    @property
-    def is_expired(self) -> bool:
-        return time.time() >= self.end_time
-
-    @property
-    def is_near_expiry(self) -> bool:
-        return 0 < self.time_remaining < 60
 
     def __str__(self) -> str:
         tr = self.time_remaining

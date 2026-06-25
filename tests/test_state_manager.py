@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from core.types import CircuitState, RiskState
 from recovery.state_manager import RecoveryManager, StateStore
 
 
@@ -152,8 +153,6 @@ class TestRecoveryManagerRecover:
 class TestRecoveryManagerSaveNow:
     @pytest.mark.asyncio
     async def test_save_now(self, store: StateStore, tmp_state_path: str) -> None:
-        from core.types import CircuitState, RiskState
-
         risk = MagicMock()
         risk.get_state = AsyncMock(return_value=RiskState())
         risk.get_positions = AsyncMock(return_value={})
@@ -171,8 +170,6 @@ class TestRecoveryManagerSaveNow:
 class TestRecoveryManagerStartStop:
     @pytest.mark.asyncio
     async def test_start_stop(self, store: StateStore) -> None:
-        from core.types import RiskState
-
         risk = MagicMock()
         risk.get_state = AsyncMock(return_value=RiskState())
         risk.get_positions = AsyncMock(return_value={})
