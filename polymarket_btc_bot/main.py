@@ -66,11 +66,9 @@ class TradingBot:
         """Configure logging."""
         log_config = self.config.get('logging', {})
         
-        # Create logs directory
         log_file = log_config.get('file', 'logs/polymarket_bot.log')
         Path(log_file).parent.mkdir(parents=True, exist_ok=True)
         
-        # Configure root logger
         logging.basicConfig(
             level=getattr(logging, log_config.get('level', 'INFO')),
             format=log_config.get('format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s'),
@@ -83,6 +81,9 @@ class TradingBot:
                 ),
             ],
         )
+        
+        from shared.http import suppress_noisy_loggers
+        suppress_noisy_loggers()
         
         global logger
         logger = logging.getLogger(__name__)

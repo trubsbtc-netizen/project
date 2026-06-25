@@ -23,27 +23,23 @@ from urllib.parse import quote
 
 import aiohttp
 
+from core.constants import (
+    DOH_PROVIDERS,
+    DOH_CACHE_TTL_S,
+    DOH_TIMEOUT_S,
+    DNS_PREFETCH_HOSTS,
+)
+
 logger = logging.getLogger(__name__)
 
-# DoH provider endpoints in priority order
 _DOH_PROVIDERS = [
-    ("cloudflare_primary",   "https://1.1.1.1/dns-query"),
-    ("cloudflare_secondary", "https://1.0.0.1/dns-query"),
-    ("google_primary",       "https://8.8.8.8/resolve"),
-    ("google_secondary",     "https://8.8.4.4/resolve"),
-    ("quad9",                "https://9.9.9.9/dns-query"),
+    (f"provider_{i}", url) for i, url in enumerate(DOH_PROVIDERS)
 ]
 
-# Hosts to pre-resolve on startup
-_PREFETCH_HOSTS = [
-    "clob.polymarket.com",
-    "ws-subscriptions-clob.polymarket.com",
-    "gamma-api.polymarket.com",
-    "data-api.polymarket.com",
-]
+_PREFETCH_HOSTS = DNS_PREFETCH_HOSTS
 
-_DNS_CACHE_TTL_S  = 300    # Cache for 5 minutes
-_DOH_TIMEOUT_S    = 3.0
+_DNS_CACHE_TTL_S  = DOH_CACHE_TTL_S
+_DOH_TIMEOUT_S    = DOH_TIMEOUT_S
 _RECORD_TYPE_A    = 1
 _RECORD_TYPE_AAAA = 28
 
@@ -107,10 +103,11 @@ class DoHResolver:
 
     async def __aenter__(self) -> "DoHResolver":
         if self._owns_session:
-            connector = aiohttp.TCPConnector(
+            from shared.http import create_tcp_connector
+            connector = create_tcp_connector(
                 ssl=True,
                 limit=10,
-                ttl_dns_cache=0,         # We manage DNS ourselves
+                ttl_dns_cache=0,
                 use_dns_cache=False,
             )
             self._session = aiohttp.ClientSession(

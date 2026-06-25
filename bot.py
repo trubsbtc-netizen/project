@@ -82,26 +82,25 @@ _CTF_SETTLEMENT_RECHECK_DELAY_S  = 60.0
 
 
 def _build_tcp_connector(config: BotConfig) -> aiohttp.TCPConnector:
-    connector_kwargs: Dict[str, Any] = {
-        "ssl": True,
-        "limit": 40,
-        "limit_per_host": 10,
-        "ttl_dns_cache": 0,
-        "use_dns_cache": False,
-        "keepalive_timeout": 60,
-        "enable_cleanup_closed": True,
-    }
+    from shared.http import create_tcp_connector
 
     params = inspect.signature(aiohttp.TCPConnector.__init__).parameters
-    if "socket_factory" in params:
-        connector_kwargs["socket_factory"] = _make_socket_factory(
-            tcp_nodelay=config.network.tcp_nodelay,
-            tcp_keepalive=config.network.tcp_keepalive,
-        )
-    elif "tcp_nodelay" in params:
-        connector_kwargs["tcp_nodelay"] = config.network.tcp_nodelay
 
-    return aiohttp.TCPConnector(**connector_kwargs)
+    if "socket_factory" in params:
+        return create_tcp_connector(
+            ssl=True, limit=40, limit_per_host=10, ttl_dns_cache=0,
+            use_dns_cache=False, keepalive_timeout=60,
+            socket_factory=_make_socket_factory(
+                tcp_nodelay=config.network.tcp_nodelay,
+                tcp_keepalive=config.network.tcp_keepalive,
+            ),
+        )
+
+    connector = create_tcp_connector(
+        ssl=True, limit=40, limit_per_host=10, ttl_dns_cache=0,
+        use_dns_cache=False, keepalive_timeout=60,
+    )
+    return connector
 
 
 def _make_socket_factory(tcp_nodelay: bool, tcp_keepalive: bool):

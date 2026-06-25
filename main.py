@@ -69,11 +69,8 @@ def setup_logging(config: BotConfig, console: bool = True) -> logging.Logger:
 		file_handler.setFormatter(formatter)
 		root_logger.addHandler(file_handler)
 
-	# Suppress noisy third-party loggers
-	logging.getLogger("websockets").setLevel(logging.WARNING)
-	logging.getLogger("asyncio").setLevel(logging.WARNING)
-	logging.getLogger("aiohttp").setLevel(logging.WARNING)
-	logging.getLogger("urllib3").setLevel(logging.WARNING)
+	from shared.http import suppress_noisy_loggers
+	suppress_noisy_loggers()
 
 	return logging.getLogger(__name__)
 

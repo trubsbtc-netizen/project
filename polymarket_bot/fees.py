@@ -8,19 +8,10 @@ from __future__ import annotations
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Optional
 
+from core.constants import CRYPTO_TAKER_FEE_RATE
+from shared.env import safe_float as finite_float
 
-CRYPTO_TAKER_FEE_RATE = 0.07
 FEE_QUANT = Decimal("0.00001")
-
-
-def finite_float(value: Any, default: float = 0.0) -> float:
-    try:
-        result = float(value)
-    except (TypeError, ValueError):
-        return default
-    if result != result or result in (float("inf"), float("-inf")):
-        return default
-    return result
 
 
 def default_taker_fee_rate_for_market(*, question: str = "", slug: str = "") -> Optional[float]:

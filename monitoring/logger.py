@@ -164,8 +164,8 @@ def setup_logging(log_level: str = "INFO", log_dir: str = "logs") -> None:
     fh.setFormatter(_JsonFormatter())
     root.addHandler(fh)
 
-    for noisy in ("aiohttp", "asyncio", "websockets", "urllib3"):
-        logging.getLogger(noisy).setLevel(logging.WARNING)
+    from shared.http import suppress_noisy_loggers
+    suppress_noisy_loggers()
 
 
 # ─────────────────────────────────────────────────────────────────

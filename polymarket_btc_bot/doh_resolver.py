@@ -98,7 +98,8 @@ class DNSOverHTTPSResolver:
     
     async def start(self):
         """Initialize HTTP session and start background tasks."""
-        connector = aiohttp.TCPConnector(
+        from shared.http import create_tcp_connector
+        connector = create_tcp_connector(
             ttl_dns_cache=300,
             use_dns_cache=True,
             limit=10,
