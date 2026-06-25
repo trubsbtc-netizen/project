@@ -14,6 +14,11 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import aiohttp
 
+from core.constants import (
+    DOH_PROVIDERS as DOH_PROVIDERS_LIST,
+    DOH_CACHE_TTL_S,
+    DOH_TIMEOUT_S,
+)
 from polymarket_bot.infrastructure.config import InfrastructureConfig
 from polymarket_bot.infrastructure.network import ConnectionPool as InfraConnectionPool
 from polymarket_bot.infrastructure.network import DoHResolver as InfraDoHResolver
@@ -30,19 +35,11 @@ _CLIENT_SESSION_SUPPORTS_PROXY = "proxy" in inspect.signature(
 class RobustDoHResolver(aiohttp.abc.AbstractResolver):
     """Backward-compatible wrapper over BTC_POLY DoHResolver."""
 
-    DOH_PROVIDERS: Tuple[str, ...] = (
-        "https://1.1.1.1/dns-query",
-        "https://1.0.0.1/dns-query",
-        "https://8.8.8.8/resolve",
-        "https://8.8.4.4/resolve",
-        "https://dns.quad9.net:5053/dns-query",
-        "https://dns.google/dns-query",
-        "https://cloudflare-dns.com/dns-query",
-    )
+    DOH_PROVIDERS: Tuple[str, ...] = tuple(DOH_PROVIDERS_LIST)
 
-    MAX_TTL: float = 300.0
+    MAX_TTL: float = DOH_CACHE_TTL_S
     NEGATIVE_TTL: float = 30.0
-    QUERY_TIMEOUT: float = 3.0
+    QUERY_TIMEOUT: float = DOH_TIMEOUT_S
     SYSTEM_FALLBACK_TTL: float = 60.0
 
     def __init__(self) -> None:
@@ -112,19 +109,17 @@ def create_tcp_connector(
 ) -> aiohttp.TCPConnector:
     if resolver is None:
         resolver = get_resolver_sync()
-    connector_kwargs: Dict[str, Any] = {
-        "resolver": resolver,
-        "family": socket.AF_INET,
-        "use_dns_cache": False,
-        "force_close": force_close,
-        "limit": limit,
-        "limit_per_host": limit_per_host,
-        "ttl_dns_cache": 300,
-        "enable_cleanup_closed": True,
-    }
-    if not force_close:
-        connector_kwargs["keepalive_timeout"] = keepalive_timeout
-    return aiohttp.TCPConnector(**connector_kwargs)
+    from shared.http import create_tcp_connector as _create
+    return _create(
+        resolver=resolver,
+        limit=limit,
+        limit_per_host=limit_per_host,
+        use_dns_cache=False,
+        force_close=force_close,
+        family=socket.AF_INET,
+        ttl_dns_cache=300,
+        keepalive_timeout=int(keepalive_timeout),
+    )
 
 
 def create_client_session(

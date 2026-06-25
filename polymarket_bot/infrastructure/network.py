@@ -12,16 +12,19 @@ from typing import Any, Dict, List, Optional
 import aiohttp
 from aiohttp.abc import AbstractResolver
 
+from core.constants import DOH_PROVIDERS
 from polymarket_bot.infrastructure.config import InfrastructureConfig
+from shared.http import create_tcp_connector
 
 logger = logging.getLogger(__name__)
 
+_DOH_QUERY_ENDPOINTS = tuple(
+    f"{url}?name={{host}}&type=A" for url in DOH_PROVIDERS
+)
+
 
 class DoHResolver(AbstractResolver):
-    ENDPOINTS = (
-        "https://cloudflare-dns.com/dns-query?name={host}&type=A",
-        "https://dns.google/resolve?name={host}&type=A",
-    )
+    ENDPOINTS = _DOH_QUERY_ENDPOINTS
 
     def __init__(self):
         self._cache: Dict[str, List[str]] = {}
@@ -72,7 +75,7 @@ class ConnectionPool:
         if self._session is not None and not self._session.closed:
             return
         timeout = aiohttp.ClientTimeout(total=self.config.http_timeout_s)
-        connector = aiohttp.TCPConnector(
+        connector = create_tcp_connector(
             resolver=DoHResolver(),
             limit=self.config.http_limit,
             limit_per_host=self.config.http_limit_per_host,

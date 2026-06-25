@@ -1,65 +1,20 @@
 from __future__ import annotations
 
-import os
 import time
 from collections import deque
 from dataclasses import dataclass, field, replace
-from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Deque, Dict, Generic, List, Optional, Sequence, Tuple, TypeVar
 
+from shared.env import (
+    env_bool as _env_bool,
+    env_float as _env_float,
+    env_int as _env_int,
+    safe_float as _safe_float,
+    utc_timestamp as _utc_timestamp,
+)
+
 T = TypeVar("T")
-
-
-def _env_bool(name: str, default: bool = False) -> bool:
-    raw = os.environ.get(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
-
-
-def _env_float(name: str, default: float) -> float:
-    raw = os.environ.get(name)
-    if raw in (None, ""):
-        return default
-    try:
-        return float(raw)
-    except ValueError:
-        return default
-
-
-def _env_int(name: str, default: int) -> int:
-    raw = os.environ.get(name)
-    if raw in (None, ""):
-        return default
-    try:
-        return int(raw)
-    except ValueError:
-        return default
-
-
-def _safe_float(value: Any, default: float = 0.0) -> float:
-    try:
-        if value is None or value == "":
-            return default
-        return float(str(value).replace(",", ""))
-    except (TypeError, ValueError):
-        return default
-
-
-def _utc_timestamp(value: Any) -> Optional[float]:
-    if isinstance(value, (int, float)):
-        return float(value)
-    if isinstance(value, str) and value:
-        text = value.strip()
-        try:
-            return datetime.fromisoformat(text.replace("Z", "+00:00")).timestamp()
-        except ValueError:
-            try:
-                return float(text)
-            except ValueError:
-                return None
-    return None
 
 
 class ServiceState(str, Enum):
